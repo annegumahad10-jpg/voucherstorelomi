@@ -253,6 +253,8 @@ function confirmOrder(id){
 
     ordersRef.once('value').then(orderSnap=>{
       const order = orderSnap.val();
+      if(!order) return alert("Order not found.");
+
       const available70 = inventory['70_percent'] ? Object.keys(inventory['70_percent']) : [];
       const available73 = inventory['73_percent'] ? Object.keys(inventory['73_percent']) : [];
 
@@ -264,133 +266,27 @@ function confirmOrder(id){
       const assigned70 = available70.slice(0, order.qty70);
       const assigned73 = available73.slice(0, order.qty73);
 
-      // Prepare single update object for both stock removal and archive
       const updates = {};
-      updates['vouchers/70_percent'] = inventory['70_percent'] || {};
-      updates['vouchers/73_percent'] = inventory['73_percent'] || {};
+
+      // Remove used vouchers from stock
       assigned70.forEach(code => updates['vouchers/70_percent/' + code] = null);
       assigned73.forEach(code => updates['vouchers/73_percent/' + code] = null);
 
-      // Move to archive and remove from orders in same call
-      updates['archivedOrders/' + id] = {
-        ...order,
-        status: "confirmed",
-        vouchersAssigned: {
-          '70_percent': assigned70,
-          '73_percent': assigned73
-        }
+      // Update order (NO ARCHIVE)
+      updates['orders/' + id + '/status'] = "confirmed";
+      updates['orders/' + id + '/vouchersAssigned'] = {
+        '70_percent': assigned70,
+        '73_percent': assigned73
       };
-      updates['orders/' + id] = null;
 
       db.ref().update(updates).then(()=>{
-        alert("Order confirmed, vouchers assigned & archived!");
+        alert("Order confirmed! Vouchers assigned successfully.");
         showAdminDashboard();
       });
     });
   });
 }
 
-/* ================= ADMIN DASHBOARD ================= */
-function showAdminDashboard(){
-  db.ref('orders').once('value').then(orderSnap=>{
-    const orders = orderSnap.val() || {};
-    let html = `<div class="card">
-      <h2>Admin Panel</h2>
-      <h3>Stock Voucher Codes</h3>
-      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
-      <button onclick="stockCodes('70_percent')">Add 70%</button>
-      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
-      <button onclick="stockCodes('73_percent')">Add 73%</button>
-      <hr>`;
-
-    for(const id in orders){
-      const o = orders[id];
-      html += `<div class="order-box">
-        <p><b>ID:</b> ${id}</p>
-        <p>Qty70: ${o.qty70 || 0}</p>
-        <p>Qty73: ${o.qty73 || 0}</p>
-        <p>Status: ${o.status}</p>`;
-      if(o.status === "pending"){
-        html += `<button onclick="confirmOrder('${id}')">Confirm & Archive</button>`;
-      }
-      html += `</div>`;
-    }
-
-    // Button to view archived orders
-    html += `<hr><button onclick="showArchivedOrders()">View Archived Orders</button>`;
-    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
-    document.getElementById("app").innerHTML = html;
-  });
-}
-
-/* ================= VIEW ARCHIVED ORDERS ================= */
-function showArchivedOrders(){
-  db.ref('archivedOrders').once('value').then(snapshot=>{
-    const archived = snapshot.val() || {};
-    let html = `<div class="card"><h2>Archived Orders</h2>`;
-
-    for(const id in archived){
-      const o = archived[id];
-      const assigned70 = o.vouchersAssigned?.['70_percent'] || [];
-      const assigned73 = o.vouchersAssigned?.['73_percent'] || [];
-
-      html += `
-        <div class="order-box">
-          <p><b>ID:</b> ${id}</p>
-          <p>Status: ${o.status}</p>
-          <p>70% Codes: ${assigned70.join(", ")}</p>
-          <p>73% Codes: ${assigned73.join(", ")}</p>
-          <button onclick="deleteArchivedOrder('${id}')">Delete Permanently</button>
-        </div>
-      `;
-    }
-
-    html += `<button onclick="showAdminDashboard()" class="secondary-btn">Back</button></div>`;
-    document.getElementById("app").innerHTML = html;
-  });
-}
-
-/* ================= DELETE ARCHIVED ORDER ================= */
-function deleteArchivedOrder(orderId){
-  if(!confirm("Are you sure you want to permanently delete this archived order?")) return;
-  db.ref('archivedOrders/' + orderId).remove().then(()=>{
-    alert("Archived order deleted permanently.");
-    showArchivedOrders();
-  });
-}
-
-/* ================= ADD BUTTON IN ADMIN DASHBOARD ================= */
-function showAdminDashboard(){
-  db.ref('orders').once('value').then(orderSnap=>{
-    const orders = orderSnap.val() || {};
-    let html = `<div class="card">
-      <h2>Admin Panel</h2>
-      <h3>Stock Voucher Codes</h3>
-      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
-      <button onclick="stockCodes('70_percent')">Add 70%</button>
-      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
-      <button onclick="stockCodes('73_percent')">Add 73%</button>
-      <hr>`;
-
-    for(const id in orders){
-      const o = orders[id];
-      html += `<div class="order-box">
-        <p><b>ID:</b> ${id}</p>
-        <p>Qty70: ${o.qty70 || 0}</p>
-        <p>Qty73: ${o.qty73 || 0}</p>
-        <p>Status: ${o.status}</p>`;
-      if(o.status === "pending"){
-        html += `<button onclick="confirmOrder('${id}')">Confirm & Archive</button>`;
-      }
-      html += `</div>`;
-    }
-
-    // Button to view archived orders
-    html += `<hr><button onclick="showArchivedOrders()">View Archived Orders</button>`;
-    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
-    document.getElementById("app").innerHTML = html;
-  });
-}
 
 
 /* ================= CHECK ORDER ================= */
