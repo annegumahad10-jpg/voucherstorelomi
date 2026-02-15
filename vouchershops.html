@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Voucher Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #ffe6f0, #ffb3d9);
+      padding: 20px;
+      color: #333;
+    }
+
+    .card {
+      background: rgba(255, 240, 250, 0.95);
+      padding: 25px;
+      border-radius: 20px;
+      max-width: 420px;
+      margin: 20px auto;
+      text-align: center;
+      box-shadow: 0 0 25px #ff66b2, 0 0 50px #ff99cc;
+      border: 2px solid #ff66b2;
+    }
+
+    h2 { color: #ff3399; text-shadow: 0 0 10px #ff99cc; font-size: 24px; }
+    h3 { color: #ff66b2; text-shadow: 0 0 8px #ffb3d9; }
+
+    button {
+      padding: 16px 24px;
+      margin-top: 12px;
+      border-radius: 14px;
+      border: none;
+      background: linear-gradient(45deg, #ff66b2, #ff3399);
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 18px;
+      box-shadow: 0 0 15px #ff66b2, 0 0 25px #ff3399;
+      transition: 0.3s;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 25px #ff99cc, 0 0 35px #ff3399;
+    }
+
+    .secondary-btn { background: linear-gradient(45deg, #ff99cc, #ffb3d9); }
+
+    input {
+      width: 95%;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 12px;
+      border: 1px solid #ff66b2;
+      background: #fff0f6;
+      color: #333;
+      outline: none;
+      box-shadow: 0 0 12px #ffb3d9;
+      font-size: 16px;
+    }
+
+    input::placeholder { color: #ff66b2; }
+    hr { margin: 20px 0; border: 1px solid #ff66b2; box-shadow: 0 0 10px #ff99cc; }
+
+    .order-box {
+      border: 1px solid #ff99cc;
+      padding: 15px;
+      margin: 12px 0;
+      border-radius: 15px;
+      box-shadow: 0 0 12px #ffb3d9;
+      font-size: 16px;
+      text-align: left;
+    }
+
+    img { max-width: 100%; height: auto; border-radius: 12px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyDh1JMuyTR0qhVsMJv_RE4rGxDh8vNDAAI",
+    authDomain: "lomibooking-5f95b.firebaseapp.com",
+    databaseURL: "https://lomibooking-5f95b-default-rtdb.firebaseio.com",
+    projectId: "lomibooking-5f95b",
+    storageBucket: "lomibooking-5f95b.firebasestorage.app",
+    messagingSenderId: "121811683518",
+    appId: "1:121811683518:web:666af06e574bcfbe0276ef"
+  };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ================= HOME ================= */
+function showHomepage() {
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <h2>Voucher Store</h2>
+      <button onclick="showBuyPage()">Buy Vouchers</button>
+      <button onclick="showMyOrder()">Check My Order</button>
+      <button onclick="showAdminLogin()" class="secondary-btn">Admin Panel</button>
+    </div>
+  `;
+}
+
+/* ================= BUY ================= */
+function showBuyPage() {
+  db.ref('vouchers').once('value').then(snapshot=>{
+    const inventory = snapshot.val() || {};
+    const stock70 = inventory['70_percent'] ? Object.keys(inventory['70_percent']).length : 0;
+    const stock73 = inventory['73_percent'] ? Object.keys(inventory['73_percent']).length : 0;
+
+    document.getElementById("app").innerHTML = `
+      <div class="card">
+        <h2>💖 Buy Vouchers 💖</h2>
+
+        <p><strong>70% Voucher - ₱25</strong><br>Available: ${stock70}</p>
+        <input type="number" id="qty70" placeholder="Quantity for 70%" min="0" max="${stock70}" oninput="calculateTotal()">
+
+        <p><strong>73% Voucher - ₱35</strong><br>Available: ${stock73}</p>
+        <input type="number" id="qty73" placeholder="Quantity for 73%" min="0" max="${stock73}" oninput="calculateTotal()">
+
+        <hr>
+        <h3>Total: ₱<span id="totalAmount">0</span></h3>
+
+        <p><strong>Scan to Pay via GCash</strong></p>
+        <img src="https://i.imgur.com/KeuBTEk.jpeg" alt="GCash QR Code" style="width:220px;">
+
+        <input type="text" id="reference" placeholder="Enter GCash Reference Number">
+        <button onclick="submitOrder()">Submit Order</button>
+        <button onclick="showHomepage()" class="secondary-btn">Back</button>
+        <div id="buyResult"></div>
+      </div>
+    `;
+  });
+}
+
+
+function calculateTotal() {
+  const qty70 = parseInt(document.getElementById("qty70").value) || 0;
+  const qty73 = parseInt(document.getElementById("qty73").value) || 0;
+  const total = qty70 * 25 + qty73 * 35;
+  document.getElementById("totalAmount").innerText = total;
+}
+
+function submitOrder(){
+  const qty70 = parseInt(document.getElementById("qty70").value) || 0;
+  const qty73 = parseInt(document.getElementById("qty73").value) || 0;
+  const reference = document.getElementById("reference").value.trim();
+
+  if(qty70 === 0 && qty73 === 0) return alert("Enter quantity.");
+  if(reference.length < 6) return alert("Invalid reference.");
+
+  const orderRef = db.ref('orders').push();
+  orderRef.set({
+    qty70,
+    qty73,
+    reference,
+    status: "pending",
+    timestamp: Date.now()
+  }).then(()=>{
+    document.getElementById("buyResult").innerHTML =
+      `<p style="color:green;">🎉 THANK YOU FOR YOUR ORDER! Your reference number is ${reference}. Await admin confirmation.</p>`;
+  });
+}
+
+/* ================= ADMIN ================= */
+function showAdminLogin(){
+  document.getElementById("app").innerHTML = `
+    <div class="card">
+      <h2>Admin Login</h2>
+      <input type="email" id="adminEmail" placeholder="Email">
+      <input type="password" id="adminPassword" placeholder="Password">
+      <button onclick="adminLogin()">Login</button>
+      <button onclick="showHomepage()" class="secondary-btn">Back</button>
+      <div id="adminLoginResult"></div>
+    </div>
+  `;
+}
+
+function adminLogin(){
+  const email = adminEmail.value.trim();
+  const password = adminPassword.value.trim();
+  firebase.auth().signInWithEmailAndPassword(email,password)
+    .then(userCredential=>{
+      const user = userCredential.user;
+      db.ref("admins/"+user.uid).once("value").then(snapshot=>{
+        if(snapshot.exists()) showAdminDashboard();
+        else { alert("Not authorized."); firebase.auth().signOut(); }
+      });
+    })
+    .catch(err=> alert(err.message));
+}
+
+/* ================= ADMIN DASHBOARD ================= */
+function showAdminDashboard(){
+  db.ref('orders').once('value').then(orderSnap=>{
+    const orders = orderSnap.val() || {};
+    let html = `<div class="card">
+      <h2>Admin Panel</h2>
+      <h3>Stock Voucher Codes</h3>
+      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
+      <button onclick="stockCodes('70_percent')">Add 70%</button>
+      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
+      <button onclick="stockCodes('73_percent')">Add 73%</button>
+      <hr>`;
+
+    for(const id in orders){
+      const o = orders[id];
+      html += `<div class="order-box">
+        <p><b>ID:</b> ${id}</p>
+        <p>Qty70: ${o.qty70 || 0}</p>
+        <p>Qty73: ${o.qty73 || 0}</p>
+        <p>Status: ${o.status}</p>`;
+      if(o.status === "pending"){
+        html += `<button onclick="confirmOrder('${id}', ${o.qty70}, ${o.qty73})">Confirm</button>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
+    document.getElementById("app").innerHTML = html;
+  });
+}
+
+/* ================= STOCK ================= */
+function stockCodes(type){
+  const inputId = type === '70_percent' ? "stock70" : "stock73";
+  const raw = document.getElementById(inputId).value.trim();
+  if(!raw) return alert("Enter codes.");
+
+  const codes = raw.split(",").map(c=>c.trim()).filter(c=>c);
+  const updates = {};
+  codes.forEach(code=> updates['vouchers/'+type+'/'+code] = true);
+
+  db.ref().update(updates).then(()=>{
+    alert("Codes added.");
+    document.getElementById(inputId).value="";
+  });
+}
+
+/* ================= CONFIRM ORDER ================= */
+function confirmOrder(id){
+  db.ref('vouchers').once('value').then(snapshot=>{
+    const inventory = snapshot.val() || {};
+    const ordersRef = db.ref('orders/' + id);
+
+    ordersRef.once('value').then(orderSnap=>{
+      const order = orderSnap.val();
+      const available70 = inventory['70_percent'] ? Object.keys(inventory['70_percent']) : [];
+      const available73 = inventory['73_percent'] ? Object.keys(inventory['73_percent']) : [];
+
+      if(order.qty70 > available70.length || order.qty73 > available73.length){
+        alert("Not enough stock!");
+        return;
+      }
+
+      const assigned70 = available70.slice(0, order.qty70);
+      const assigned73 = available73.slice(0, order.qty73);
+
+      // Prepare single update object for both stock removal and archive
+      const updates = {};
+      updates['vouchers/70_percent'] = inventory['70_percent'] || {};
+      updates['vouchers/73_percent'] = inventory['73_percent'] || {};
+      assigned70.forEach(code => updates['vouchers/70_percent/' + code] = null);
+      assigned73.forEach(code => updates['vouchers/73_percent/' + code] = null);
+
+      // Move to archive and remove from orders in same call
+      updates['archivedOrders/' + id] = {
+        ...order,
+        status: "confirmed",
+        vouchersAssigned: {
+          '70_percent': assigned70,
+          '73_percent': assigned73
+        }
+      };
+      updates['orders/' + id] = null;
+
+      db.ref().update(updates).then(()=>{
+        alert("Order confirmed, vouchers assigned & archived!");
+        showAdminDashboard();
+      });
+    });
+  });
+}
+
+/* ================= ADMIN DASHBOARD ================= */
+function showAdminDashboard(){
+  db.ref('orders').once('value').then(orderSnap=>{
+    const orders = orderSnap.val() || {};
+    let html = `<div class="card">
+      <h2>Admin Panel</h2>
+      <h3>Stock Voucher Codes</h3>
+      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
+      <button onclick="stockCodes('70_percent')">Add 70%</button>
+      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
+      <button onclick="stockCodes('73_percent')">Add 73%</button>
+      <hr>`;
+
+    for(const id in orders){
+      const o = orders[id];
+      html += `<div class="order-box">
+        <p><b>ID:</b> ${id}</p>
+        <p>Qty70: ${o.qty70 || 0}</p>
+        <p>Qty73: ${o.qty73 || 0}</p>
+        <p>Status: ${o.status}</p>`;
+      if(o.status === "pending"){
+        html += `<button onclick="confirmOrder('${id}')">Confirm & Archive</button>`;
+      }
+      html += `</div>`;
+    }
+
+    // Button to view archived orders
+    html += `<hr><button onclick="showArchivedOrders()">View Archived Orders</button>`;
+    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
+    document.getElementById("app").innerHTML = html;
+  });
+}
+
+/* ================= VIEW ARCHIVED ORDERS ================= */
+function showArchivedOrders(){
+  db.ref('archivedOrders').once('value').then(snapshot=>{
+    const archived = snapshot.val() || {};
+    let html = `<div class="card"><h2>Archived Orders</h2>`;
+
+    for(const id in archived){
+      const o = archived[id];
+      const assigned70 = o.vouchersAssigned?.['70_percent'] || [];
+      const assigned73 = o.vouchersAssigned?.['73_percent'] || [];
+
+      html += `
+        <div class="order-box">
+          <p><b>ID:</b> ${id}</p>
+          <p>Status: ${o.status}</p>
+          <p>70% Codes: ${assigned70.join(", ")}</p>
+          <p>73% Codes: ${assigned73.join(", ")}</p>
+          <button onclick="deleteArchivedOrder('${id}')">Delete Permanently</button>
+        </div>
+      `;
+    }
+
+    html += `<button onclick="showAdminDashboard()" class="secondary-btn">Back</button></div>`;
+    document.getElementById("app").innerHTML = html;
+  });
+}
+
+/* ================= DELETE ARCHIVED ORDER ================= */
+function deleteArchivedOrder(orderId){
+  if(!confirm("Are you sure you want to permanently delete this archived order?")) return;
+  db.ref('archivedOrders/' + orderId).remove().then(()=>{
+    alert("Archived order deleted permanently.");
+    showArchivedOrders();
+  });
+}
+
+/* ================= ADD BUTTON IN ADMIN DASHBOARD ================= */
+function showAdminDashboard(){
+  db.ref('orders').once('value').then(orderSnap=>{
+    const orders = orderSnap.val() || {};
+    let html = `<div class="card">
+      <h2>Admin Panel</h2>
+      <h3>Stock Voucher Codes</h3>
+      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
+      <button onclick="stockCodes('70_percent')">Add 70%</button>
+      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
+      <button onclick="stockCodes('73_percent')">Add 73%</button>
+      <hr>`;
+
+    for(const id in orders){
+      const o = orders[id];
+      html += `<div class="order-box">
+        <p><b>ID:</b> ${id}</p>
+        <p>Qty70: ${o.qty70 || 0}</p>
+        <p>Qty73: ${o.qty73 || 0}</p>
+        <p>Status: ${o.status}</p>`;
+      if(o.status === "pending"){
+        html += `<button onclick="confirmOrder('${id}')">Confirm & Archive</button>`;
+      }
+      html += `</div>`;
+    }
+
+    // Button to view archived orders
+    html += `<hr><button onclick="showArchivedOrders()">View Archived Orders</button>`;
+    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
+    document.getElementById("app").innerHTML = html;
+  });
+}
+
+
+/* ================= CHECK ORDER ================= */
+function showMyOrder(){
+  const reference = prompt("Enter reference:");
+  if(!reference) return;
+
+  db.ref('orders').once('value').then(snapshot=>{
+    const orders = snapshot.val() || {};
+    for(const id in orders){
+      const o = orders[id];
+      if(o.reference === reference){
+        const assigned70 = o.vouchersAssigned?.['70_percent'] || [];
+        const assigned73 = o.vouchersAssigned?.['73_percent'] || [];
+        document.getElementById("app").innerHTML = `
+          <div class="card">
+            <h2>My Order</h2>
+            <p>Status: ${o.status}</p>
+            <p>70% Codes: ${assigned70.join(", ") || "None"}</p>
+            <p>73% Codes: ${assigned73.join(", ") || "None"}</p>
+            <button onclick="showHomepage()">Back</button>
+          </div>
+        `;
+        return;
+      }
+    }
+    alert("Order not found.");
+  });
+}
+
+showHomepage();
+</script>
+</body>
+</html>
