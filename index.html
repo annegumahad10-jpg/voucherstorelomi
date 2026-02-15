@@ -236,14 +236,21 @@ function stockCodes(type){
   if(!raw) return alert("Enter codes.");
 
   const codes = raw.split(",").map(c=>c.trim()).filter(c=>c);
-  const updates = {};
-  codes.forEach(code=> updates['vouchers/'+type+'/'+code] = true);
 
-  db.ref().update(updates).then(()=>{
-    alert("Codes added.");
+  const voucherRef = db.ref('vouchers/' + type);
+
+  const promises = codes.map(code => {
+    return voucherRef.push({
+      code: code
+    });
+  });
+
+  Promise.all(promises).then(()=>{
+    alert("Codes added successfully!");
     document.getElementById(inputId).value="";
   });
 }
+
 
 /* ================= CONFIRM ORDER ================= */
 function confirmOrder(id){
@@ -255,8 +262,8 @@ function confirmOrder(id){
       const order = orderSnap.val();
       if(!order) return alert("Order not found.");
 
-      const available70 = inventory['70_percent'] ? Object.keys(inventory['70_percent']) : [];
-      const available73 = inventory['73_percent'] ? Object.keys(inventory['73_percent']) : [];
+      const available70 = inventory['70_percent'] ? Object.entries(inventory['70_percent']) : [];
+      const available73 = inventory['73_percent'] ? Object.entries(inventory['73_percent']) : [];
 
       if(order.qty70 > available70.length || order.qty73 > available73.length){
         alert("Not enough stock!");
@@ -268,25 +275,29 @@ function confirmOrder(id){
 
       const updates = {};
 
-      // Remove used vouchers from stock
-      assigned70.forEach(code => updates['vouchers/70_percent/' + code] = null);
-      assigned73.forEach(code => updates['vouchers/73_percent/' + code] = null);
+      // Remove from stock
+      assigned70.forEach(([key]) => {
+        updates['vouchers/70_percent/' + key] = null;
+      });
 
-      // Update order (NO ARCHIVE)
+      assigned73.forEach(([key]) => {
+        updates['vouchers/73_percent/' + key] = null;
+      });
+
+      // Save assigned codes into order
       updates['orders/' + id + '/status'] = "confirmed";
       updates['orders/' + id + '/vouchersAssigned'] = {
-        '70_percent': assigned70,
-        '73_percent': assigned73
+        '70_percent': assigned70.map(([k,v]) => v.code),
+        '73_percent': assigned73.map(([k,v]) => v.code)
       };
 
       db.ref().update(updates).then(()=>{
-        alert("Order confirmed! Vouchers assigned successfully.");
+        alert("Order confirmed! Vouchers assigned.");
         showAdminDashboard();
       });
     });
   });
 }
-
 
 
 /* ================= CHECK ORDER ================= */
