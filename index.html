@@ -10,7 +10,6 @@
       padding: 20px;
       color: #333;
     }
-
     .card {
       background: rgba(255, 240, 250, 0.95);
       padding: 25px;
@@ -21,10 +20,8 @@
       box-shadow: 0 0 25px #ff66b2, 0 0 50px #ff99cc;
       border: 2px solid #ff66b2;
     }
-
     h2 { color: #ff3399; text-shadow: 0 0 10px #ff99cc; font-size: 24px; }
     h3 { color: #ff66b2; text-shadow: 0 0 8px #ffb3d9; }
-
     button {
       padding: 16px 24px;
       margin-top: 12px;
@@ -40,14 +37,8 @@
       width: 100%;
       max-width: 320px;
     }
-
-    button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 0 25px #ff99cc, 0 0 35px #ff3399;
-    }
-
+    button:hover { transform: scale(1.05); box-shadow: 0 0 25px #ff99cc, 0 0 35px #ff3399; }
     .secondary-btn { background: linear-gradient(45deg, #ff99cc, #ffb3d9); }
-
     input {
       width: 95%;
       padding: 14px;
@@ -60,10 +51,8 @@
       box-shadow: 0 0 12px #ffb3d9;
       font-size: 16px;
     }
-
     input::placeholder { color: #ff66b2; }
     hr { margin: 20px 0; border: 1px solid #ff66b2; box-shadow: 0 0 10px #ff99cc; }
-
     .order-box {
       border: 1px solid #ff99cc;
       padding: 15px;
@@ -73,7 +62,6 @@
       font-size: 16px;
       text-align: left;
     }
-
     img { max-width: 100%; height: auto; border-radius: 12px; margin: 10px 0; }
   </style>
 </head>
@@ -93,7 +81,7 @@ const firebaseConfig = {
     storageBucket: "lomibooking-5f95b.firebasestorage.app",
     messagingSenderId: "121811683518",
     appId: "1:121811683518:web:666af06e574bcfbe0276ef"
-  };
+};
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -119,74 +107,92 @@ function showBuyPage() {
     document.getElementById("app").innerHTML = `
       <div class="card">
         <h2>💖 Buy Vouchers 💖</h2>
-
         <p><strong>70% Voucher - ₱25</strong><br>Available: ${stock70}</p>
         <input type="number" id="qty70" placeholder="Quantity for 70%" min="0" max="${stock70}" oninput="calculateTotal()">
-
         <p><strong>73% Voucher - ₱35</strong><br>Available: ${stock73}</p>
         <input type="number" id="qty73" placeholder="Quantity for 73%" min="0" max="${stock73}" oninput="calculateTotal()">
-
         <hr>
         <h3>Total: ₱<span id="totalAmount">0</span></h3>
-
         <p><strong>Scan to Pay via GCash</strong></p>
         <img src="https://i.imgur.com/KeuBTEk.jpeg" alt="GCash QR Code" style="width:220px;">
-
         <input type="text" id="reference" placeholder="Enter GCash Reference Number">
-        <button onclick="submitOrder()">Submit Order</button>
+        <button id="submitBtn">Submit Order</button>
         <button onclick="showHomepage()" class="secondary-btn">Back</button>
         <div id="buyResult"></div>
       </div>
     `;
+
+    document.getElementById("submitBtn").addEventListener("click", submitOrder);
   });
 }
-
 
 function calculateTotal() {
   const qty70 = parseInt(document.getElementById("qty70").value) || 0;
   const qty73 = parseInt(document.getElementById("qty73").value) || 0;
-  const total = qty70 * 25 + qty73 * 35;
-  document.getElementById("totalAmount").innerText = total;
+  document.getElementById("totalAmount").innerText = qty70*25 + qty73*35;
 }
 
-function submitOrder(){
+/* ================= SUBMIT ORDER ================= */
+let isSubmitting = false;
+function submitOrder() {
+  if(isSubmitting) return;
+  isSubmitting = true;
+
+  const submitBtn = document.getElementById("submitBtn");
+  submitBtn.disabled = true;
+  submitBtn.innerText = "Processing...";
+
   const qty70 = parseInt(document.getElementById("qty70").value) || 0;
   const qty73 = parseInt(document.getElementById("qty73").value) || 0;
   const reference = document.getElementById("reference").value.trim();
 
-  if(qty70 === 0 && qty73 === 0) return alert("Enter quantity.");
-  if(reference.length < 6) return alert("Invalid reference.");
+  if(qty70===0 && qty73===0){
+    alert("Enter quantity.");
+    submitBtn.disabled=false;
+    submitBtn.innerText="Submit Order";
+    isSubmitting=false;
+    return;
+  }
+  if(reference.length<6){
+    alert("Invalid reference.");
+    submitBtn.disabled=false;
+    submitBtn.innerText="Submit Order";
+    isSubmitting=false;
+    return;
+  }
 
-  const orderRef = db.ref('orders').push();
-  orderRef.set({
-    qty70,
-    qty73,
-    reference,
-    status: "pending",
-    timestamp: Date.now()
-  }).then(()=>{
-    document.getElementById("buyResult").innerHTML =
-      `<p style="color:green;">🎉 THANK YOU FOR YOUR ORDER! Your reference number is ${reference}. Await admin confirmation.</p>`;
-  });
+  db.ref('orders').push({qty70, qty73, reference, status:"pending", timestamp:Date.now()})
+    .then(()=>{
+      document.getElementById("buyResult").innerHTML = `<p style="color:green;">🎉 THANK YOU! Your order reference is <b>${reference}</b>. Redirecting...</p>`;
+      setTimeout(()=>{ showHomepage(); isSubmitting=false; }, 2000);
+    })
+    .catch(err=>{
+      alert("Something went wrong.");
+      console.error(err);
+      submitBtn.disabled=false;
+      submitBtn.innerText="Submit Order";
+      isSubmitting=false;
+    });
 }
 
 /* ================= ADMIN ================= */
-function showAdminLogin(){
+function showAdminLogin() {
   document.getElementById("app").innerHTML = `
     <div class="card">
       <h2>Admin Login</h2>
       <input type="email" id="adminEmail" placeholder="Email">
       <input type="password" id="adminPassword" placeholder="Password">
-      <button onclick="adminLogin()">Login</button>
+      <button id="adminLoginBtn">Login</button>
       <button onclick="showHomepage()" class="secondary-btn">Back</button>
       <div id="adminLoginResult"></div>
     </div>
   `;
+  document.getElementById("adminLoginBtn").addEventListener("click", adminLogin);
 }
 
 function adminLogin(){
-  const email = adminEmail.value.trim();
-  const password = adminPassword.value.trim();
+  const email = document.getElementById("adminEmail").value.trim();
+  const password = document.getElementById("adminPassword").value.trim();
   firebase.auth().signInWithEmailAndPassword(email,password)
     .then(userCredential=>{
       const user = userCredential.user;
@@ -195,129 +201,119 @@ function adminLogin(){
         else { alert("Not authorized."); firebase.auth().signOut(); }
       });
     })
-    .catch(err=> alert(err.message));
+    .catch(err=>alert(err.message));
 }
 
 /* ================= ADMIN DASHBOARD ================= */
 function showAdminDashboard(){
-  db.ref('orders').once('value').then(orderSnap=>{
-    const orders = orderSnap.val() || {};
-    let html = `<div class="card">
-      <h2>Admin Panel</h2>
-      <h3>Stock Voucher Codes</h3>
-      <input type="text" id="stock70" placeholder="Add 70% codes (comma separated)">
-      <button onclick="stockCodes('70_percent')">Add 70%</button>
-      <input type="text" id="stock73" placeholder="Add 73% codes (comma separated)">
-      <button onclick="stockCodes('73_percent')">Add 73%</button>
-      <hr>`;
+  db.ref('orders').once('value').then(snapshot=>{
+    const orders = snapshot.val() || {};
+    const app = document.getElementById("app");
+    app.innerHTML = "";
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const h2 = document.createElement("h2"); h2.textContent="Admin Panel"; card.appendChild(h2);
+    const h3 = document.createElement("h3"); h3.textContent="Stock Voucher Codes"; card.appendChild(h3);
+
+    const stock70Input=document.createElement("input");
+    stock70Input.id="stock70"; stock70Input.placeholder="Add 70% codes (comma separated)"; card.appendChild(stock70Input);
+    const stock70Btn=document.createElement("button"); stock70Btn.textContent="Add 70%"; stock70Btn.onclick=()=>stockCodes('70_percent'); card.appendChild(stock70Btn);
+
+    const stock73Input=document.createElement("input");
+    stock73Input.id="stock73"; stock73Input.placeholder="Add 73% codes (comma separated)"; card.appendChild(stock73Input);
+    const stock73Btn=document.createElement("button"); stock73Btn.textContent="Add 73%"; stock73Btn.onclick=()=>stockCodes('73_percent'); card.appendChild(stock73Btn);
+
+    card.appendChild(document.createElement("hr"));
 
     for(const id in orders){
       const o = orders[id];
-      html += `<div class="order-box">
+      const box = document.createElement("div"); box.className="order-box";
+      box.innerHTML=`
         <p><b>ID:</b> ${id}</p>
-        <p>Qty70: ${o.qty70 || 0}</p>
-        <p>Qty73: ${o.qty73 || 0}</p>
-        <p>Status: ${o.status}</p>`;
-      if(o.status === "pending"){
-        html += `<button onclick="confirmOrder('${id}', ${o.qty70}, ${o.qty73})">Confirm</button>`;
+        <p><b>Reference:</b> ${o.reference}</p>
+        <p>Qty70: ${o.qty70||0}</p>
+        <p>Qty73: ${o.qty73||0}</p>
+        <p>Status: ${o.status}</p>
+      `;
+
+      if(o.status==="pending"){
+        const confirmBtn=document.createElement("button");
+        confirmBtn.textContent="Confirm";
+        confirmBtn.onclick=()=>confirmOrder(id);
+        box.appendChild(confirmBtn);
+      } else {
+        const deleteBtn=document.createElement("button");
+        deleteBtn.textContent="Delete";
+        deleteBtn.onclick=()=>deleteOrder(id);
+        box.appendChild(deleteBtn);
       }
-      html += `</div>`;
+      card.appendChild(box);
     }
 
-    html += `<button onclick="showHomepage()" class="secondary-btn">Back</button></div>`;
-    document.getElementById("app").innerHTML = html;
+    const backBtn=document.createElement("button");
+    backBtn.textContent="Back"; backBtn.className="secondary-btn"; backBtn.onclick=showHomepage;
+    card.appendChild(backBtn);
+
+    app.appendChild(card);
   });
+}
+
+/* ================= CONFIRM & DELETE ================= */
+function confirmOrder(id){
+  db.ref('vouchers').once('value').then(snapshot=>{
+    const inventory=snapshot.val()||{};
+    db.ref('orders/'+id).once('value').then(orderSnap=>{
+      const order=orderSnap.val();
+      if(!order) return alert("Order not found.");
+      const available70=inventory['70_percent']?Object.entries(inventory['70_percent']):[];
+      const available73=inventory['73_percent']?Object.entries(inventory['73_percent']):[];
+      if(order.qty70>available70.length || order.qty73>available73.length){ alert("Not enough stock!"); return; }
+      const assigned70=available70.slice(0,order.qty70);
+      const assigned73=available73.slice(0,order.qty73);
+      const updates={};
+      assigned70.forEach(([k])=>updates['vouchers/70_percent/'+k]=null);
+      assigned73.forEach(([k])=>updates['vouchers/73_percent/'+k]=null);
+      updates['orders/'+id+'/status']="confirmed";
+      updates['orders/'+id+'/vouchersAssigned']={ '70_percent':assigned70.map(([k,v])=>v.code), '73_percent':assigned73.map(([k,v])=>v.code)};
+      db.ref().update(updates).then(()=>{ alert("Order confirmed!"); showAdminDashboard(); });
+    });
+  });
+}
+
+function deleteOrder(id){
+  if(confirm("Are you sure you want to delete this order?")){
+    db.ref('orders/'+id).remove().then(()=>{ alert("Order deleted."); showAdminDashboard(); });
+  }
 }
 
 /* ================= STOCK ================= */
 function stockCodes(type){
-  const inputId = type === '70_percent' ? "stock70" : "stock73";
-  const raw = document.getElementById(inputId).value.trim();
+  const inputId=type==='70_percent'?"stock70":"stock73";
+  const raw=document.getElementById(inputId).value.trim();
   if(!raw) return alert("Enter codes.");
-
-  const codes = raw.split(",").map(c=>c.trim()).filter(c=>c);
-
-  const voucherRef = db.ref('vouchers/' + type);
-
-  const promises = codes.map(code => {
-    return voucherRef.push({
-      code: code
-    });
-  });
-
-  Promise.all(promises).then(()=>{
-    alert("Codes added successfully!");
-    document.getElementById(inputId).value="";
-  });
+  const codes=raw.split(",").map(c=>c.trim()).filter(c=>c);
+  const voucherRef=db.ref('vouchers/'+type);
+  Promise.all(codes.map(code=>voucherRef.push({code}))).then(()=>{ alert("Codes added successfully!"); document.getElementById(inputId).value=""; });
 }
-
-
-/* ================= CONFIRM ORDER ================= */
-function confirmOrder(id){
-  db.ref('vouchers').once('value').then(snapshot=>{
-    const inventory = snapshot.val() || {};
-    const ordersRef = db.ref('orders/' + id);
-
-    ordersRef.once('value').then(orderSnap=>{
-      const order = orderSnap.val();
-      if(!order) return alert("Order not found.");
-
-      const available70 = inventory['70_percent'] ? Object.entries(inventory['70_percent']) : [];
-      const available73 = inventory['73_percent'] ? Object.entries(inventory['73_percent']) : [];
-
-      if(order.qty70 > available70.length || order.qty73 > available73.length){
-        alert("Not enough stock!");
-        return;
-      }
-
-      const assigned70 = available70.slice(0, order.qty70);
-      const assigned73 = available73.slice(0, order.qty73);
-
-      const updates = {};
-
-      // Remove from stock
-      assigned70.forEach(([key]) => {
-        updates['vouchers/70_percent/' + key] = null;
-      });
-
-      assigned73.forEach(([key]) => {
-        updates['vouchers/73_percent/' + key] = null;
-      });
-
-      // Save assigned codes into order
-      updates['orders/' + id + '/status'] = "confirmed";
-      updates['orders/' + id + '/vouchersAssigned'] = {
-        '70_percent': assigned70.map(([k,v]) => v.code),
-        '73_percent': assigned73.map(([k,v]) => v.code)
-      };
-
-      db.ref().update(updates).then(()=>{
-        alert("Order confirmed! Vouchers assigned.");
-        showAdminDashboard();
-      });
-    });
-  });
-}
-
 
 /* ================= CHECK ORDER ================= */
 function showMyOrder(){
-  const reference = prompt("Enter reference:");
-  if(!reference) return;
-
+  const reference=prompt("Enter reference:"); if(!reference) return;
   db.ref('orders').once('value').then(snapshot=>{
-    const orders = snapshot.val() || {};
+    const orders=snapshot.val()||{};
     for(const id in orders){
-      const o = orders[id];
-      if(o.reference === reference){
-        const assigned70 = o.vouchersAssigned?.['70_percent'] || [];
-        const assigned73 = o.vouchersAssigned?.['73_percent'] || [];
-        document.getElementById("app").innerHTML = `
+      const o=orders[id];
+      if(o.reference===reference){
+        const assigned70=o.vouchersAssigned?.['70_percent']||[];
+        const assigned73=o.vouchersAssigned?.['73_percent']||[];
+        document.getElementById("app").innerHTML=`
           <div class="card">
             <h2>My Order</h2>
             <p>Status: ${o.status}</p>
-            <p>70% Codes: ${assigned70.join(", ") || "None"}</p>
-            <p>73% Codes: ${assigned73.join(", ") || "None"}</p>
+            <p>70% Codes: ${assigned70.join(", ")||"None"}</p>
+            <p>73% Codes: ${assigned73.join(", ")||"None"}</p>
             <button onclick="showHomepage()">Back</button>
           </div>
         `;
